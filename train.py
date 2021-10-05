@@ -167,7 +167,7 @@ def train():
         #     val_acc = check_accuracy(test_dataloader,model)
         #     write_test_scalars(logger,epoch,val_acc)
             # loop.set_postfix(val_acc=)
-        for imgs, labels in loop:
+        for imgs, labels, toa in loop:
             loop.set_description(f"Epoch  [{epoch+1}/{num_epochs}]")
             imgs = imgs.to(device)
             labels = torch.squeeze(labels)
