@@ -4,6 +4,7 @@ import glob
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
+import numpy as np
 
 from PIL import Image
 
@@ -33,15 +34,20 @@ class MyDataset(Dataset):
         self.seq_length = seq_length
         self.transform = transform
         self.length = length
+        self.n_frames = 50
+        self.anno_path = '../Crash-1500.txt'
+        self.toa_dict = self.get_toa_all(self.anno_path)
 
-    def get_toa_all(self, data_path):
+    def get_toa_all(self, anno_path):
         toa_dict = {}
-        annofile = os.path.join(data_path, 'videos', 'Crash-1500.txt')
+        # annofile = os.path.join(image_paths, 'videos', 'Crash-1500.txt')
+        annofile = anno_path
         annoData = self.read_anno_file(annofile)
         for anno in annoData:
             labels = np.array(anno['label'], dtype=np.int)
             toa = np.where(labels == 1)[0][0]
             toa = min(max(1, toa), self.n_frames-1)
+            # toa = min(max(1, toa), 49)
             toa_dict[anno['vid']] = toa
         return toa_dict
 
@@ -70,19 +76,32 @@ class MyDataset(Dataset):
         images = []
         for i in indices:
             image_path = self.image_paths[i][0]
+            # print(image_path)
             image = Image.open(image_path)
             if self.transform:
                 image = self.transform(image)
             images.append(image)
-        x = torch.stack(images)
+
+        #getting the video ID
+        video_id = self.image_paths[i][0]
+        vid = video_id.split('/')[-2]
+
+        x = torch.stack(images) #TODO: device
         if self.image_paths[start][1] == 1:
             label = 0
         else:
             label = 1
         # y = torch.tensor([self.image_paths[start][1]], dtype=torch.long)
-        y = torch.tensor([label], dtype=torch.long)
+        y = torch.tensor([label]) #TODO: device
 
-        return x, y
+        if label == 1:
+            toa = [self.toa_dict[vid]]
+        else:
+            toa = [self.n_frames + 1]
+        print(toa)
+        toa = torch.Tensor((toa)) #TODO: device
+
+        return x, y, toa
 
     def __len__(self):
         return self.length
