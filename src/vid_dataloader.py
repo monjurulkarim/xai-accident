@@ -99,7 +99,7 @@ class MyDataset(Dataset):
         else:
             toa = [self.n_frames + 1]
         print(toa)
-        toa = torch.Tensor((toa)) #TODO: device
+        toa = torch.Tensor((toa)) #TODO: device, probably datatype long also
 
         return x, y, toa
 
