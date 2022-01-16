@@ -9,18 +9,11 @@ import pandas as pd
 currentDirectory = os.getcwd()
 print(currentDirectory)
 
-up= os.path.abspath(os.curdir)
-video_directory = osp.join(up,'ustring/data/crash/videos/Crash-1500')
-print(video_directory)
+video_directory = 'Normal/'
+destination = 'negative/'
 
 video_list = os.listdir(video_directory)
-# video_list = video_list[10:]
-print(video_list[:10])
 
-destination = osp.join(currentDirectory, 'extracted_frames')
-print(destination)
-
-# video_list = video_list[:1]
 count = 0
 for i in range(len(video_list)):
     filename = os.path.join(video_directory,video_list[i])
@@ -61,7 +54,7 @@ for i in range(len(video_list)):
             destination_2 = destination + saved_path
             if not os.path.exists(destination_2):
                 os.makedirs(destination_2)
-                print(destination_2)
+#                 print(destination_2)
 
             destination_dir = osp.join(destination_2, frame_name)
             cv2.imwrite(destination_dir,image)
