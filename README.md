@@ -1,5 +1,5 @@
 # Explainable Accident Anticipation
-This is <b> partial implementation </b> of the paper, <a href="https://arxiv.org/pdf/2108.00273.pdf7"> "Towards explainable artificial intelligence (XAI) for early anticipation of traffic accidents"</a> by Muhammad Monjurul Karim, Yu Li, and Ruwen Qin, accepted at Transportation Research Record.</p>
+This is <b> partial implementation </b> of the paper, <a href="https://arxiv.org/pdf/2108.00273"> "Towards explainable artificial intelligence (XAI) for early anticipation of traffic accidents"</a> by Muhammad Monjurul Karim, Yu Li, and Ruwen Qin, accepted at Transportation Research Record.</p>
 
 ## Dataset
 This code currently support CCD dataset for accident anticipation. 
