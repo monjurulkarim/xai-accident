@@ -9,10 +9,10 @@ This code currently support CCD dataset for accident anticipation.
 
 ## Folder structure
 File structure:
-Master folder should include
--> "xai-accident-fork" folder with cloned code. 
--> "data" folder with training and testing data.
--> "Crash-1500" annotation text file.
+Your root-level folder should include
+> * "xai-accident-fork" folder with cloned code.
+> * "data" folder with training and testing data.
+> * "Crash-1500" annotation text file.
 
 ## Environment
 Tested using conda package with pytorch and cuda.
