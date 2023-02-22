@@ -13,7 +13,7 @@ import numpy as np
 from src.eval_tools import evaluation_P_R80, print_results, vis_results
 from natsort import natsorted
 
-os.environ['CUDA_VISIBLE_DEVICES']= '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 device = ("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -36,18 +36,19 @@ num_workers = 10
 train_data_path = '../data/train/'
 test_data_path = '../data/test/'
 
-#--------------train data----------------------------------------
+# --------------train data----------------------------------------
 train_class_paths = [d.path for d in os.scandir(train_data_path) if d.is_dir]
-
+print(train_class_paths)
 
 train_class_image_paths = []
 train_end_idx = []
+path_temp = ""
 for c, class_path in enumerate(train_class_paths):
     for d in os.scandir(class_path):
         if d.is_dir:
             paths = natsorted(glob.glob(os.path.join(d.path, '*.jpg')))
             paths = [(p, c) for p in paths]
-
+            path_temp = paths
             train_class_image_paths.extend(paths)
             train_end_idx.extend([len(paths)])
 
@@ -55,9 +56,9 @@ train_end_idx = [0, *train_end_idx]
 train_end_idx = torch.cumsum(torch.tensor(train_end_idx), 0)
 seq_length = 49
 
-train_sampler = MySampler(train_end_idx,seq_length)
+train_sampler = MySampler(train_end_idx, seq_length)
 
-##-------------Test data-------------------------------
+# -------------Test data-------------------------------
 test_class_paths = [d.path for d in os.scandir(test_data_path) if d.is_dir]
 
 test_class_image_paths = []
@@ -74,6 +75,8 @@ for c, class_path in enumerate(test_class_paths):
 test_end_idx = [0, *test_end_idx]
 test_end_idx = torch.cumsum(torch.tensor(test_end_idx), 0)
 seq_length = 49
+
+print(test_end_idx)
 
 test_sampler = MySampler(test_end_idx,seq_length)
 
@@ -94,6 +97,7 @@ test_dataloader = DataLoader(dataset= test_data, batch_size=batch_size, sampler=
 
 def write_scalars(logger, epoch, loss):
     logger.add_scalars('train/loss',{'loss':loss}, epoch)
+
 
 def write_test_scalars(logger, epoch, losses, metrics):
     # logger.add_scalars('test/loss',{'loss':loss}, epoch)
@@ -128,7 +132,7 @@ def write_test_scalars(logger, epoch, losses, metrics):
 #     return float(num_correct)/float(num_samples)*100
 
 
-def test(test_dataloader, model):
+def eval(test_dataloader, model):
     all_pred = []
     all_labels = []
     losses_all = []
@@ -206,12 +210,10 @@ def train():
             param.requires_grad = True
         else:
             param.requires_grad = False
-    #==============================================================================
-
-
+    # ==============================================================================
 
     model.train()
-    loss_best=50
+    loss_best = 50
 
     for epoch in range(num_epochs):
         loop = tqdm(train_dataloader,total = len(train_dataloader), leave = True)
@@ -219,6 +221,7 @@ def train():
         #     val_acc = check_accuracy(test_dataloader,model)
         #     write_test_scalars(logger,epoch,val_acc)
             # loop.set_postfix(val_acc=)
+        print(len(loop), loop)
         for imgs, labels, toa in loop:
             loop.set_description(f"Epoch  [{epoch+1}/{num_epochs}]")
             imgs = imgs.to(device)
@@ -242,7 +245,7 @@ def train():
         print('-------------------------------')
         print('------Starting evaluation------')
         model.eval()
-        all_pred, all_labels, all_toas, losses_all = test(test_dataloader, model)
+        all_pred, all_labels, all_toas, losses_all = eval(test_dataloader, model)
         total_loss = sum(losses_all)
         metrics = {}
         metrics['AP'], metrics['mTTA'], metrics['TTA_R80'], metrics['PR80']= evaluation_P_R80(all_pred, all_labels, all_toas, 10)
@@ -257,6 +260,7 @@ def train():
             loss_best = total_loss
             torch.save(model.state_dict(),best_model_file)
     logger.close()
+
 
 if __name__ == "__main__":
     train()

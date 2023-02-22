@@ -48,12 +48,11 @@ class AccidentXai(nn.Module):
         self.x_dim = x_dim
         self.h_dim = h_dim
         self.z_dim = z_dim
-        self.n_layers= n_layers
-        self.num_classes= num_classes
+        self.n_layers = n_layers
+        self.num_classes = num_classes
         self.features = FeatureExtractor(num_classes, device)
-        self.gru_net = GRUNet(h_dim+h_dim, h_dim, 2,n_layers, dropout=[0.5,0.0])
+        self.gru_net = GRUNet(h_dim+h_dim, h_dim, 2, n_layers, dropout=[0.5,0.0])
         self.ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
-
 
     def forward(self,x,y,toa):
         losses = {'total_loss': 0}
@@ -70,8 +69,6 @@ class AccidentXai(nn.Module):
             losses['total_loss']+=L1
             all_output.append(output) #TO-DO: all hidden
         return losses, all_output
-
-
 
     def _exp_loss(self, pred, target, time, toa, fps=10.0):
             '''

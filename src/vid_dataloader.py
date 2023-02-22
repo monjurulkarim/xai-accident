@@ -10,13 +10,16 @@ from PIL import Image
 
 os.environ['CUDA_VISIBLE_DEVICES']= '0'
 
+
 class MySampler(torch.utils.data.Sampler):
     def __init__(self, end_idx, seq_length):
         indices = []
         for i in range(len(end_idx)-1):
+
             start = end_idx[i]
             # end = end_idx[i+1] - seq_length
             end = end_idx[i+1] - seq_length
+
             indices.append(torch.arange(start, end))
         indices = torch.cat(indices)
 
@@ -78,13 +81,16 @@ class MyDataset(Dataset):
         # print('Getting images from {} to {}'.format(start, end))
         indices = list(range(start, end))
         images = []
+
         for i in indices:
-            image_path = self.image_paths[i][0]
-            # print('image_path :', image_path)
-            image = Image.open(image_path)
-            if self.transform:
-                image = self.transform(image)
-            images.append(image)
+
+            if len(self.image_paths) != 0:
+                image_path = self.image_paths[i][0]
+                #print('image_path :', image_path)
+                image = Image.open(image_path)
+                if self.transform:
+                    image = self.transform(image)
+                images.append(image)
         # print('=============================')
 
         #getting the video ID
