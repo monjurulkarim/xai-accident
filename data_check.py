@@ -1,3 +1,6 @@
+"""
+Tests to see if the data structure is correct.
+"""
 import os
 import glob
 

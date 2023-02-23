@@ -1,3 +1,7 @@
+"""
+Trains and saves the xai-accident model.
+"""
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader

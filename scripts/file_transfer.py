@@ -1,3 +1,7 @@
+"""
+Splits the annotated data into negative training and positive training.
+"""
+
 import numpy as np
 import matplotlib.pyplot as plt
 import cv2
