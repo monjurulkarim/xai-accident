@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 best_model_path = "../snapshot/saved_model_00.pth"
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 device = ("cuda" if torch.cuda.is_available() else "cpu")
 
 transform = transforms.Compose(
@@ -35,11 +34,11 @@ batch_size = 10
 num_workers = 10
 
 # Load saved model
-
-
 model = AccidentXai(num_classes, x_dim, h_dim, z_dim,n_layers).to(device)
 model.load_state_dict(torch.load(best_model_path))
 
+# Currently works using test dataloader
+# Must be modified for custom dataset use later
 test_data_path = '../data/test/'
 
 # -------------Test data-------------------------------
@@ -69,7 +68,11 @@ test_data = MyDataset(image_paths= test_class_image_paths,
 
 test_dataloader = DataLoader(dataset= test_data, batch_size=batch_size, sampler=test_sampler)
 
-# Tuun evaluation mode on in the model
+# Turn on evaluation mode on in the model
+model.eval()
+
+# Extract evalution values from model output
+
 all_pred = []
 all_labels = []
 losses_all = []
@@ -108,12 +111,9 @@ with torch.no_grad():
         all_toas = np.hstack((np.hstack(all_toas[0][:-1]), all_toas[0][-1]))
 
         # print(all_pred, all_labels, all_toas, losses_all)
+        # Loop breaks after one cycle, otherwise loop trhows an error.
         break
 
-plt.plot(all_pred[8])
-
+# Predictions for evaluated set number 9
+plt.plot(all_pred[9])
 plt.show()
-
-
-
-
