@@ -40,10 +40,11 @@ def extract_conv_features(model, image):
 
     processed = []
     for feature_map in outputs_f:
+
         feature_map = feature_map.squeeze(0)
         gray_scale = torch.sum(feature_map, 0)
         gray_scale = gray_scale / feature_map.shape[0]
-        processed.append(gray_scale.data.cpu().numpy())
+        processed.append(feature_map.data.cpu().numpy())
         # for fm in processed:
         # print(fm.shape)
 

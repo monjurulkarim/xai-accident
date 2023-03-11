@@ -18,7 +18,7 @@ import utils
 
 import shap
 
-best_model_path = "../snapshot/saved_model_00.pth"
+best_model_path = "../snapshot/best_model.pth"
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -85,13 +85,14 @@ test_data = MyDataset(image_paths=test_class_image_paths,
                       transform=transform,
                       length=len(test_sampler))
 
-test_dataloader = DataLoader(dataset=test_data, batch_size=batch_size)
+test_dataloader = DataLoader(dataset=test_data, batch_size=batch_size, sampler=test_sampler)
 
 # Turn on evaluation mode on in the model
-model.eval()
+
 
 
 def get_predictions(model):
+    model.eval()
     all_pred = []
     all_labels = []
     losses_all = []
@@ -155,7 +156,6 @@ def weights_calculator(grads):
     grads = grads / (torch.sqrt(torch.mean(torch.pow(grads, 2))) + 1e-5)
     return torch.nn.AvgPool2d(grads.size()[2:])(grads)
 
-
 def aggregate_feature_weights(input_weights, input_features):
     # Aggregate Feature map with weights
     # 2, 3, 56, 56 ******** 1, 512
@@ -172,6 +172,8 @@ def aggregate_feature_weights(input_weights, input_features):
     return f_inter
 
 
+pred, _, _ = get_predictions(model)
+
 # Grad CAM
 model.train()
 loop = tqdm(test_dataloader, total=len(test_dataloader), leave=True)
@@ -183,13 +185,15 @@ for imgs, labels, toa in loop:
 
     list_forward = []
     list_backward = []
+    print(model.features.resnet)
 
-    NAME = 'features.resnet.layer4.1.conv2'
+    NAME = 'features.resnet.layer4.2.conv2'
 
     for i, j in model.named_modules():
         # print(i)
         if i == NAME:
             print("registered layer", NAME)
+            print(i)
             j.register_forward_hook(forward_recorder)
             j.register_backward_hook(backward_recorder)
 
@@ -211,25 +215,25 @@ for imgs, labels, toa in loop:
     num_frames = imgs.size()[1]
 
     # Process only batch number 0
-    #output = outputs[0]
     imgs = imgs[0]
-
 
     for t in range(num_frames):
 
-        print("outputs")
-        #print(outputs)
-        print(outputs[t][0].shape)
-
-        print("images")
-        print(imgs.shape)
-        print(imgs[t].shape)
-
-        print("forward list size and len")
-        print(list_forward[0].size(), len(list_forward))
+        # print("outputs")
+        # #print(outputs)
+        # print(outputs[t][0].shape)
+        #
+        # print("images")
+        # print(imgs.shape)
+        # print(imgs[t].shape)
+        #
+        # print("forward list size and len")
+        # print(list_forward[0].size(), len(list_forward))
 
         output = outputs[t][0]
         output.backward(torch.tensor([1.0, 0.0]).to(device), retain_graph=True)
+
+        grad = list_backward[0][0]
         print("backward list size and len")
         print(list_backward[0].size(), len(list_backward))
 
@@ -237,21 +241,38 @@ for imgs, labels, toa in loop:
         print("weight calculation result")
         weights = weights_calculator(list_backward[0][0])
         weights.resize_(weights.size()[1])
-        print(weights_calculator(list_backward[0][0]).size)
-        print(weights)
         print(weights.shape)
         print("------------------------------------------------------------------")
 
         processed = utils.extract_conv_features(model, imgs[t])
-        gc = aggregate_feature_weights(weights, processed[0])
-        print(gc)
-        print(gc.shape)
+        #gc = aggregate_feature_weights(weights, processed[0])
+        #print(gc.shape)
 
+        print("shapes of feature map and grad")
+        print(processed[-2].shape)
+        print(grad.shape)
+
+        feature_map = torch.tensor(processed[-2])
+        # gcam = torch.FloatTensor(56, 56).zero_()
+        # for fmap, weight in zip(feature_map, weights):
+        #     gcam = gcam + fmap * weight.data
+
+        gcam = 0
+        for i in range(512):
+            #print(i)
+            cw = (1/16 * grad[i].sum())
+            prod = feature_map[i] * cw
+            gcam = gcam + prod
+
+        f_grad_cam = torch.relu(torch.tensor(gcam))
+        print(f_grad_cam.shape)
         ii = np.rot90(imgs[t].cpu().detach().numpy().T, -1)
 
-        fig, axs = plt.subplots(2, 1)
-        axs[0].imshow(np.fliplr(gc))
-        axs[1].imshow(ii + 0.35)
+        fig, axs = plt.subplots(1, 2)
+        axs[0].imshow(ii + 0.55)
+        axs[1].imshow(f_grad_cam)
+        plt.title(pred[0][t])
+
     break
 
 plt.show()
