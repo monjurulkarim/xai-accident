@@ -11,15 +11,27 @@ device = ("cuda" if torch.cuda.is_available() else "cpu")
 #Feature extract
 class FeatureExtractor(nn.Module):
     def __init__(self, num_classes, device):
-        super(FeatureExtractor,self).__init__()
+        super(FeatureExtractor, self).__init__()
         self.resnet = models.resnet50(pretrained=True) #for transfer learning
         self.resnet.fc = nn.Sequential(
                        nn.Linear(2048, 512))
 
-    def forward(self,x):
-        x = self.resnet(x)
-        return x
+    def forward(self, x):
+        x_r = self.resnet(x)
+        return x_r
 
+    # def feature_map(self, x):
+    #     x_ft = self.featuremap(x)
+    #     return x_ft
+
+# class FeatureMapExtractor(nn.Module):
+#     def __init__(self, num_classes, device):
+#         super(FeatureMapExtractor, self).__init__()
+#         self.resnet = models.resnet50(pretrained=True) #for transfer learning
+#
+#     def forward(self, x):
+#         x_r = self.resnet(x)
+#         return x_r
 
 #Recurrent Neural Network
 class GRUNet(nn.Module):
@@ -51,24 +63,50 @@ class AccidentXai(nn.Module):
         self.n_layers = n_layers
         self.num_classes = num_classes
         self.features = FeatureExtractor(num_classes, device)
+        #self.featuremap = FeatureMapExtractor(num_classes, device)
         self.gru_net = GRUNet(h_dim+h_dim, h_dim, 2, n_layers, dropout=[0.5,0.0])
         self.ce_loss = torch.nn.CrossEntropyLoss(reduction='none')
 
-    def forward(self,x,y,toa):
+    def forward(self, x, y, toa):
         losses = {'total_loss': 0}
-        all_output, all_hidden = [], []
+        all_output, all_hidden, all_features = [], [], []
         h = Variable(torch.zeros(self.n_layers, x.size(0), self.h_dim))
         h = h.to(x.device)
+        #print(x.size(1))
         for t in range(x.size(1)):
             x_t = self.features(x[:,t])
+            #x_ft = self.features.featuremap(x[:,t])
+            #all_features.append(x_ft)
             x_t = torch.unsqueeze(x_t,1)
-            # print('x_t shape: ', x_t.shape)
+
+            #print('x_t shape: ', x_t.shape)
+            # Notes from the paper!
+            # The feature vector x_t is given to GRU to learn
+            # the hidden representation of the frame
+
             output, h = self.gru_net(x_t,h)
-            #computing losses
+
+            #print(output, h)
+            # computing losses
             L1 =self._exp_loss(output,y,t,toa=toa,fps=10.0)
             losses['total_loss']+=L1
+            #print(output, "output in model")
             all_output.append(output) #TO-DO: all hidden
-        return losses, all_output
+        return losses, all_output, all_features
+
+    # def forward(self, x):
+    #     all_output, all_hidden, all_features = [], [], []
+    #     h = Variable(torch.zeros(self.n_layers, x.size(0), self.h_dim))
+    #     h = h.to(x.device)
+    #     for t in range(x.size(1)):
+    #         x_t = self.features(x[:,t])
+    #         x_ft = self.features.feature_map(x[:,t])
+    #         all_features.append(x_ft)
+    #         x_t = torch.unsqueeze(x_t,1)
+    #
+    #         output, h = self.gru_net(x_t,h)
+    #
+    #     return output
 
     def _exp_loss(self, pred, target, time, toa, fps=10.0):
             '''

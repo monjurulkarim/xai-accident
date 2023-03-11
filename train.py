@@ -149,7 +149,7 @@ def eval(test_dataloader, model):
             labels = torch.squeeze(labels)
             labels = labels.to(device)
             # outputs = model(imgs)
-            loss, outputs = model(imgs,labels,toa)
+            loss, outputs, _ = model(imgs,labels,toa)
             loss = loss['total_loss'].item()
             losses_all.append(loss)
             num_frames = imgs.size()[1]
@@ -232,7 +232,7 @@ def train():
             labels = torch.squeeze(labels)
             labels = labels.to(device)
             # outputs = model(imgs)
-            loss, outputs = model(imgs,labels,toa)
+            loss, outputs, _ = model(imgs,labels,toa)
             # loss = custom_loss(outputs, labels)
             optimizer.zero_grad()
             loss['total_loss'].mean().backward()
