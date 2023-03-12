@@ -17,8 +17,16 @@ class FeatureExtractor(nn.Module):
                        nn.Linear(2048, 512))
 
     def forward(self, x):
-        x_r = self.resnet(x)
-        return x_r
+        x = self.resnet(x)
+        # h = x.register_hook(self.activations_hook)
+        # x_r = self.classifier(x)
+        return x
+
+    def activations_hook(self, grad):
+        self.gradients = grad
+
+    def get_activations_gradient(self):
+        return self.gradients
 
     # def feature_map(self, x):
     #     x_ft = self.featuremap(x)

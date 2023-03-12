@@ -48,6 +48,4 @@ def extract_conv_features(model, image):
         # for fm in processed:
         # print(fm.shape)
 
-    # print(processed[-1].shape)
-    # print(processed[0].shape)
     return processed
