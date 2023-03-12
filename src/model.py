@@ -15,22 +15,45 @@ class FeatureExtractor(nn.Module):
         self.resnet = models.resnet50(pretrained=True) #for transfer learning
         self.resnet.fc = nn.Sequential(
                        nn.Linear(2048, 512))
+        self.gradient = None
 
     def forward(self, x):
-        x = self.resnet(x)
-        # h = x.register_hook(self.activations_hook)
-        # x_r = self.classifier(x)
+
+        # if x.requires_grad:
+        #     #print(torch.nn.Sequential(*(list(self.resnet.children())[:-2])))
+        #     #fex = torch.nn.Sequential(*(list(self.resnet.children())[:-2]))
+        #     self.resnet.fc = nn.Sequential()
+        #     self.resnet.avgpool = nn.Sequential()
+        #     x_f = self.resnet(x)
+        #     self.resnet.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1)).to(device)
+        #     self.resnet.fc = nn.Sequential(nn.Linear(2048, 512)).to(device)
+        #
+        #     #print(x_f.shape)
+        #     #print(self.resnet)
+        #     x.register_hook(self.activations_hook)
+        if x.requires_grad:
+            x = self.resnet.conv1(x)
+            x = self.resnet.bn1(x)
+            x = self.resnet.relu(x)
+            x = self.resnet.maxpool(x)
+
+            x = self.resnet.layer1(x)
+            x = self.resnet.layer2(x)
+            x = self.resnet.layer3(x)
+            x = self.resnet.layer4(x)
+            x.register_hook(self.activations_hook)
+            x = self.resnet.avgpool(x)
+            x = self.resnet.fc(x.reshape(2, 2048))
+        else:
+            x = self.resnet(x)
         return x
 
     def activations_hook(self, grad):
-        self.gradients = grad
+        self.gradient = grad
 
     def get_activations_gradient(self):
-        return self.gradients
+        return self.gradient
 
-    # def feature_map(self, x):
-    #     x_ft = self.featuremap(x)
-    #     return x_ft
 
 # class FeatureMapExtractor(nn.Module):
 #     def __init__(self, num_classes, device):

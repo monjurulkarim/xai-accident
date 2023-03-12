@@ -90,7 +90,6 @@ test_dataloader = DataLoader(dataset=test_data, batch_size=batch_size)
 # Turn on evaluation mode on in the model
 
 
-
 def get_predictions(model):
     model.eval()
     all_pred = []
@@ -192,23 +191,6 @@ for imgs, labels, toa in loop:
     labels = torch.squeeze(labels)
     labels = labels.to(device)
 
-    activation = feature_extractor(torch.rand(2, 3, 112, 112).to(device))
-    print(activation.shape)
-
-    list_forward = []
-    list_backward = []
-    print()
-
-    NAME = 'features.resnet.layer4.2.relu'
-
-    for i, j in model.named_modules():
-        # print(i)
-        if i == NAME:
-            # print("registered layer", NAME)
-            # print(i)
-            j.register_forward_hook(forward_recorder)
-            j.register_backward_hook(backward_recorder)
-
     loss, outputs, features = model(imgs, labels, toa)
     L = loss['total_loss']
 
@@ -221,106 +203,41 @@ for imgs, labels, toa in loop:
 
     t_10 = np.arange(0, 10)
     t_10 = np.tile(t_10, 5)
-    print(t_10)
 
     t_5 = []
     for a in range(0, 5, 1):
         for a_10 in range(10):
             t_5.append(a)
 
-    print(t_5)
-
+    activation = feature_extractor(imgs)
+    # Image frame loop
     for t in range(num_frames):
-
-        # print("outputs")
-        # #print(outputs)
-        # print(outputs[t][0].shape)
-        #
-        # print("images")
-        # print(imgs.shape)
-        # print(imgs[t].shape)
-        #
-        # print("forward list size and len")
-        # print(list_forward[0].size(), len(list_forward))
-
         output = outputs[t][0]
-        #print(output)
-
+        # Backward gradient descent
         output.backward(torch.tensor([1.0, 0.0]).to(device), retain_graph=True)
+        # Get feature map
+        feature_map = activation[t].cpu().detach()  # Select batch 1
+        # Get gradient from model
+        gradient = model.features.get_activations_gradient()
+        gradient = gradient[0].cpu()
 
-        # gradients = model.features.get_activations_gradient()
-        # print(" Grad shape new", gradients)
-
-        grad = list_backward[0][0]
-        print()
-        print("backward list size and len")
-        print(list_backward[0].size(), len(list_backward))
-
-        # print("------------------------------------------------------------------")
-        # print("weight calculation result")
-        # weights = weights_calculator(list_backward[0][0])
-        # weights.resize_(weights.size()[1])
-        # print(weights.shape)
-        # print("------------------------------------------------------------------")
-
-        processed = utils.extract_conv_features(model, imgs[t])
-
-        # print("-----------------------------------------------------------------")
-        # fig = plt.figure(figsize=(150, 350))
-        # for i in range(len(processed)):
-        #     a = fig.add_subplot(10, 5, i + 1)
-        #     imgplot = plt.imshow(processed[i])
-        #     a.axis("off")
-        # plt.savefig(str('feature_maps.jpg'), bbox_inches='tight')
-        # plt.show()
-        # print("-----------------------------------------------------------------")
-
-        #gc = aggregate_feature_weights(weights, processed[0])
-        #print(gc.shape)
-
-        # for p in range(len(processed)):
-        #     print(p, processed[p].shape)
-
-        #feature_map = torch.tensor(processed[48])
-        feature_map = activation[0].cpu().detach() # Select batch 1
-        print("shapes of feature map and gradient")
-        print(feature_map.shape)
-        print(grad.shape)
         channel_amount = len(feature_map[:])
-
-        # gcam = torch.FloatTensor(56, 56).zero_()
-        # for fmap, weight in zip(feature_map, weights):
-        #     gcam = gcam + fmap * weight.data
-
-        print("gradient mean value")
-        print(torch.mean(grad))
-        pooled_gradients = torch.mean(grad, dim=[1, 2])
-        print(pooled_gradients)
-        print("pooled grad shape", pooled_gradients.shape)
+        pooled_gradients = torch.mean(gradient, dim=[1, 2])
 
         for i in range(channel_amount):
-            # print(feature_map[i, :, :])
-            # print(pooled_gradients[i])
             feature_map[i, :, :] *= pooled_gradients[i]
 
+        # Average channelswise
         heatmap = torch.mean(feature_map, dim=0).squeeze()
-        heatmap = np.maximum(heatmap, 0)
+        # Relu
+        heatmap = torch.relu(torch.tensor(heatmap))
+        # Normalization
         heatmap /= torch.max(heatmap)
         heatmap = np.uint8(255 * heatmap)
 
         #plt.matshow(heatmap.squeeze())
 
-        # gcam = 0
-        # divider = len(grad[0][:])*2
-        # for i in range(channel_amount):
-        #     cw = (1/divider * grad[i].sum())
-        #     prod = feature_map[i] * cw
-        #     gcam = gcam + prod
-        #
-        # f_grad_cam = torch.relu(torch.tensor(gcam))
-        # print(f_grad_cam.shape)
         ii = np.rot90(imgs[t].cpu().detach().numpy().T, -1)
-
         dx, dy = 0.05, 0.05
         x = np.arange(-3.0, 3.0, dx)
         y = np.arange(-3.0, 3.0, dy)
@@ -335,9 +252,7 @@ for imgs, labels, toa in loop:
 
         axs[t1][t2].set_title(pred[0][t])
         axs[t1][t2].imshow(ii + 0.55, interpolation='nearest', extent=extent)
-        # axs[t1+1][t2].imshow(ii + 0.55, interpolation='nearest', extent=extent)
-        # axs[t1+1][t2].imshow(f_grad_cam, cmap=plt.cm.viridis, alpha=.9, interpolation='bilinear', extent=extent)
-        axs[t1][t2].imshow(heatmap, extent=extent, cmap=plt.cm.viridis, alpha=.75, interpolation='bilinear')
+        axs[t1][t2].imshow(heatmap, extent=extent, cmap=plt.cm.inferno, alpha=.65, interpolation='bilinear')
 
     break
 
