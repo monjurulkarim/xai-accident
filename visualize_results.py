@@ -85,7 +85,7 @@ test_data = MyDataset(image_paths=test_class_image_paths,
                       transform=transform,
                       length=len(test_sampler))
 
-test_dataloader = DataLoader(dataset=test_data, batch_size=batch_size, sampler=test_sampler)
+test_dataloader = DataLoader(dataset=test_data, batch_size=batch_size)
 
 # Turn on evaluation mode on in the model
 
@@ -187,35 +187,36 @@ for imgs, labels, toa in loop:
     list_backward = []
     print(model.features.resnet)
 
-    NAME = 'features.resnet.layer4.2.conv2'
+    NAME = 'features.resnet.layer4.2.relu'
 
     for i, j in model.named_modules():
         # print(i)
         if i == NAME:
-            print("registered layer", NAME)
-            print(i)
+            # print("registered layer", NAME)
+            # print(i)
             j.register_forward_hook(forward_recorder)
             j.register_backward_hook(backward_recorder)
 
     loss, outputs, features = model(imgs, labels, toa)
     L = loss['total_loss']
 
-    # print("-----------------------------------------------------------------")
-    # fig = plt.figure(figsize=(150, 350))
-    # for i in range(len(processed)):
-    #     a = fig.add_subplot(10, 5, i + 1)
-    #     imgplot = plt.imshow(processed[i])
-    #     a.axis("off")
-    #     a.set_title(names[i].split('(')[0], fontsize=2)
-    # plt.savefig(str('feature_maps.jpg'), bbox_inches='tight')
-    # plt.show()
-    # print("-----------------------------------------------------------------")
+
 
     # Process each of the 50 frames
     num_frames = imgs.size()[1]
-
     # Process only batch number 0
     imgs = imgs[0]
+
+    fig, axs = plt.subplots(10, 10)
+
+    t_10 = np.arange(0, 10)
+    t_10 = np.tile(t_10, 5)
+
+    t_5 = []
+    for a in range(0, 10, 2):
+        for a_10 in range(10):
+            t_5.append(a)
+    #print(np.array(t_5))
 
     for t in range(num_frames):
 
@@ -244,23 +245,42 @@ for imgs, labels, toa in loop:
         print(weights.shape)
         print("------------------------------------------------------------------")
 
+
+
         processed = utils.extract_conv_features(model, imgs[t])
+
+        # print(
+        #     "-----------------------------------------------------------------")
+        # fig = plt.figure(figsize=(150, 350))
+        # for i in range(len(processed)):
+        #     a = fig.add_subplot(10, 5, i + 1)
+        #     imgplot = plt.imshow(processed[i])
+        #     a.axis("off")
+        #     a.set_title(names[i].split('(')[0], fontsize=2)
+        # plt.savefig(str('feature_maps.jpg'), bbox_inches='tight')
+        # plt.show()
+        # print("-----------------------------------------------------------------")
+
         #gc = aggregate_feature_weights(weights, processed[0])
         #print(gc.shape)
 
-        print("shapes of feature map and grad")
-        print(processed[-2].shape)
-        print(grad.shape)
+        # for p in range(len(processed)):
+        #     print(p, processed[p].shape)
 
-        feature_map = torch.tensor(processed[-2])
+        feature_map = torch.tensor(processed[48])
+        print("shapes of feature map and gradient")
+        print(feature_map.shape)
+        print(grad.shape)
+        channel_amount = len(feature_map[:])
+
         # gcam = torch.FloatTensor(56, 56).zero_()
         # for fmap, weight in zip(feature_map, weights):
         #     gcam = gcam + fmap * weight.data
 
         gcam = 0
-        for i in range(512):
-            #print(i)
-            cw = (1/16 * grad[i].sum())
+        divider = len(grad[0][:])*2
+        for i in range(channel_amount):
+            cw = (1/divider * grad[i].sum())
             prod = feature_map[i] * cw
             gcam = gcam + prod
 
@@ -268,11 +288,19 @@ for imgs, labels, toa in loop:
         print(f_grad_cam.shape)
         ii = np.rot90(imgs[t].cpu().detach().numpy().T, -1)
 
-        fig, axs = plt.subplots(1, 2)
-        axs[0].imshow(ii + 0.55)
-        axs[1].imshow(f_grad_cam)
-        plt.title(pred[0][t])
+        dx, dy = 0.05, 0.05
+        x = np.arange(-3.0, 3.0, dx)
+        y = np.arange(-3.0, 3.0, dy)
+        X, Y = np.meshgrid(x, y)
+        extent = np.min(x), np.max(x), np.min(y), np.max(y)
 
+        t1 = t_5[t]
+        t2 = t_10[t]
+        axs[t1][t2].set_title(pred[0][t])
+        axs[t1][t2].imshow(ii + 0.55, interpolation='nearest', extent=extent)
+        # axs[t1+1][t2].imshow(ii + 0.55, interpolation='nearest', extent=extent)
+        # axs[t1+1][t2].imshow(f_grad_cam, cmap=plt.cm.viridis, alpha=.9, interpolation='bilinear', extent=extent)
+        axs[t1+1][t2].imshow(f_grad_cam, extent=extent, cmap=plt.cm.viridis, interpolation='bilinear')
     break
 
 plt.show()
