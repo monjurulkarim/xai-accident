@@ -16,6 +16,7 @@ class FeatureExtractor(nn.Module):
         self.resnet.fc = nn.Sequential(
                        nn.Linear(2048, 512))
         self.gradient = None
+        self.features = None
 
     def forward(self, x):
 
@@ -41,6 +42,8 @@ class FeatureExtractor(nn.Module):
             x = self.resnet.layer2(x)
             x = self.resnet.layer3(x)
             x = self.resnet.layer4(x)
+            #print(x.shape)
+            self.features = x
             x.register_hook(self.activations_hook)
             x = self.resnet.avgpool(x)
             x = self.resnet.fc(x.reshape(2, 2048))
@@ -53,6 +56,9 @@ class FeatureExtractor(nn.Module):
 
     def get_activations_gradient(self):
         return self.gradient
+
+    def get_features(self):
+        return self.features
 
 
 # class FeatureMapExtractor(nn.Module):

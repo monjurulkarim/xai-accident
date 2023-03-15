@@ -30,7 +30,7 @@ transform = transforms.Compose(
         ]
     )
 
-num_epochs = 10
+num_epochs = 30
 num_classes = 2
 learning_rate = 0.0001
 batch_size = 10

@@ -1,9 +1,9 @@
+"""
+Script to test XAI methods on.
+"""
+
 import glob
 import torch
-from pytorch_grad_cam import GradCAM, HiResCAM, ScoreCAM, GradCAMPlusPlus, \
-    AblationCAM, XGradCAM, EigenCAM, FullGrad
-from pytorch_grad_cam.utils.model_targets import ClassifierOutputTarget
-from pytorch_grad_cam.utils.image import show_cam_on_image
 from natsort import natsorted
 from src.model import AccidentXai
 import os
@@ -13,24 +13,11 @@ from src.vid_dataloader import MySampler, MyDataset
 from tqdm import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
-from torch import nn
-import utils
-
-import shap
 
 best_model_path = "../snapshot/best_model.pth"
-
+#best_model_path = "../snapshot/saved_model_05.pth"
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
 device = ("cuda" if torch.cuda.is_available() else "cpu")
-
-torch.cuda.set_per_process_memory_fraction(0.5, 0)
-torch.cuda.empty_cache()
-
-total_memory = torch.cuda.get_device_properties(0).total_memory
-tmp_tensor = torch.empty(int(total_memory * 0.499), dtype=torch.int8,
-                         device='cuda')
-del tmp_tensor
 torch.cuda.empty_cache()
 
 U = 112
@@ -108,6 +95,7 @@ def get_predictions(model):
             # outputs = model(imgs)
             loss, outputs, _ = model(imgs, labels, toa)
             loss = loss['total_loss'].item()
+
             losses_all.append(loss)
             num_frames = imgs.size()[1]
             batch_size = imgs.size()[0]
@@ -142,14 +130,6 @@ def get_predictions(model):
     return all_pred, all_labels, all_toas
 
 
-def forward_recorder(module, input, output):
-    list_forward.append(output.data.cpu())
-
-
-def backward_recorder(module, grad_in, grad_out):
-    list_backward.append(grad_out[0].data.cpu())
-
-
 def weights_calculator(grads):
     # normalize the weights first
     grads = grads / (torch.sqrt(torch.mean(torch.pow(grads, 2))) + 1e-5)
@@ -171,6 +151,28 @@ def aggregate_feature_weights(input_weights, input_features):
     #     mode='bilinear')
     return f_inter
 
+# def check_accuracy(loader, model):
+#     num_correct = 0
+#     num_samples = 0
+#     model.eval()
+#
+#     with torch.no_grad():
+#         for x, y, z in loader:
+#             print(x.shape, y.shape, z.shape)
+#             x = x.to(device=device)
+#             y = y.to(device=device)
+#             z = z.to(device=device)
+#             outputs = model(x, y, z)
+#             _, predictions = torch.max(outputs, 1)
+#             predictions = predictions.to(device)
+#             label = torch.squeeze(y)
+#             num_correct += (predictions == label).sum()
+#             num_samples += predictions.size(0)
+#     print('accuracy : ', float(num_correct)/float(num_samples)*100)
+#     print('===================================')
+#     # return f"{float(num_correct)/float(num_samples)*100:.2f}"
+#     return float(num_correct)/float(num_samples)*100
+
 
 pred, _, _ = get_predictions(model)
 
@@ -178,28 +180,41 @@ pred, _, _ = get_predictions(model)
 model = AccidentXai(num_classes, x_dim, h_dim, z_dim, n_layers).to(device)
 model.load_state_dict(torch.load(best_model_path))
 
-print(model.features.resnet)
+#print(model.features.resnet)
 
-feature_extractor = torch.nn.Sequential(*(list(model.features.resnet.children())[:-2]))
+#feature_extractor = torch.nn.Sequential(*(list(model.features.resnet.children())[:-2]))
+
+
+class ResnetFeatureExtractor(torch.nn.Module):
+    def __init__(self, model):
+        super(ResnetFeatureExtractor, self).__init__()
+        self.model = model
+        self.feature_extractor = torch.nn.Sequential(
+            *list(self.model.children())[:-1])
+
+    def __call__(self, x):
+        return self.feature_extractor(x)
+
+
+feature_extractor = ResnetFeatureExtractor(model.features)
 
 model.train()
-
+asdf = 0
 loop = tqdm(test_dataloader, total=len(test_dataloader), leave=True)
 for imgs, labels, toa in loop:
     imgs = imgs.to(device)
     imgs.requires_grad_()
     labels = torch.squeeze(labels)
     labels = labels.to(device)
-
     loss, outputs, features = model(imgs, labels, toa)
     L = loss['total_loss']
-
     # Process each of the 50 frames
     num_frames = imgs.size()[1]
     # Process only batch number 0
-    imgs = imgs[0]
+    img_batch = imgs[0]
 
     fig, axs = plt.subplots(5, 10)
+
 
     t_10 = np.arange(0, 10)
     t_10 = np.tile(t_10, 5)
@@ -209,17 +224,21 @@ for imgs, labels, toa in loop:
         for a_10 in range(10):
             t_5.append(a)
 
-    activation = feature_extractor(imgs)
+    activation = feature_extractor(img_batch)
     # Image frame loop
     for t in range(num_frames):
         output = outputs[t][0]
         # Backward gradient descent
-        output.backward(torch.tensor([1.0, 0.0]).to(device), retain_graph=True)
+        #output.backward(torch.tensor([1.0, 0.0]).to(device), retain_graph=True)
+        output.mean().backward(retain_graph=True)
         # Get feature map
         feature_map = activation[t].cpu().detach()  # Select batch 1
         # Get gradient from model
         gradient = model.features.get_activations_gradient()
         gradient = gradient[0].cpu()
+
+        # print("grad and feature shape")
+        # print(gradient.shape, feature_map.shape)
 
         channel_amount = len(feature_map[:])
         pooled_gradients = torch.mean(gradient, dim=[1, 2])
@@ -230,14 +249,17 @@ for imgs, labels, toa in loop:
         # Average channelswise
         heatmap = torch.mean(feature_map, dim=0).squeeze()
         # Relu
-        heatmap = torch.relu(torch.tensor(heatmap))
+        heatmap = torch.relu(torch.tensor(heatmap.clone()))
         # Normalization
         heatmap /= torch.max(heatmap)
-        heatmap = np.uint8(255 * heatmap)
+        threshold = 0.66
+        for hl in range(len(heatmap)):
+            for vl in range(len(heatmap)):
+                if heatmap[hl, vl] < threshold:
+                    heatmap[hl, vl] = heatmap[hl, vl] - 0.45
 
-        #plt.matshow(heatmap.squeeze())
-
-        ii = np.rot90(imgs[t].cpu().detach().numpy().T, -1)
+        ii = np.rot90(img_batch[t].cpu().detach().numpy().T, -1)
+        ii = np.fliplr(ii)
         dx, dy = 0.05, 0.05
         x = np.arange(-3.0, 3.0, dx)
         y = np.arange(-3.0, 3.0, dy)
@@ -250,10 +272,10 @@ for imgs, labels, toa in loop:
         # if t1 == 2:
         #     break
 
-        axs[t1][t2].set_title(pred[0][t])
-        axs[t1][t2].imshow(ii + 0.55, interpolation='nearest', extent=extent)
-        axs[t1][t2].imshow(heatmap, extent=extent, cmap=plt.cm.inferno, alpha=.65, interpolation='bilinear')
-
+        axs[t1][t2].set_title(np.round(pred[0][t], 3))
+        axs[t1][t2].imshow(ii + 0.55, interpolation='nearest', cmap=plt.cm.gray, extent=extent)
+        axs[t1][t2].imshow(heatmap, extent=extent, cmap=plt.cm.jet, alpha=.6, interpolation='bilinear')
+        axs[t1][t2].axis('off')
     break
 
 plt.show()
