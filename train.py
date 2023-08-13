@@ -102,31 +102,6 @@ def write_test_scalars(logger, epoch, losses, metrics):
     logger.add_scalars('test/accuracy/time-to-accident',{'mTTA':metrics['mTTA'], 'TTA_R80':metrics['TTA_R80']}, epoch)
 
 
-# def check_accuracy(loader, model):
-#     if loader == train_dataloader:
-#         print("Checking accuracy on training data")
-#     else:
-#         print("Checking accuracy on validation data")
-#
-#     num_correct = 0
-#     num_samples = 0
-#     model.eval()
-#
-#     with torch.no_grad():
-#         for x, y in loader:
-#             x = x.to(device=device)
-#             y = y.to(device=device)
-#             outputs = model(x.float())
-#             _, predictions = torch.max(outputs, 1)
-#             predictions = predictions.to(device)
-#             label = torch.squeeze(y)
-#             num_correct += (predictions == label).sum()
-#             num_samples += predictions.size(0)
-#     print('accuracy : ', float(num_correct)/float(num_samples)*100)
-#     print('===================================')
-#     # return f"{float(num_correct)/float(num_samples)*100:.2f}"
-#     return float(num_correct)/float(num_samples)*100
-
 
 def test(test_dataloader, model):
     all_pred = []
